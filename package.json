@@ -1,13 +1,32 @@
 {
-    "name": "redis-hash"
-  , "version": "0.0.1"
-  , "description": "redis hash wrapper"
-  , "keywords": ["redis", "hash", "wrapper"]
-  , "repository" :
-    { "type" : "git"
-      , "url" : "https://github.com/FarzadT/redis-hash.git"
-    }
-  , "author": "Farzad Towhidi"
-  , "main": "index"
-  , "engines": { "node": ">= 0.6.0" }
+  "name": "redis-hash",
+  "version": "0.0.1",
+  "description": "redis hash wrapper",
+  "keywords": [
+    "redis",
+    "hash",
+    "wrapper"
+  ],
+  "dependencies": {
+    "redis" : "0.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FarzadT/redis-hash.git"
+  },
+  "author": {
+    "name": "Farzad Towhidi"
+  },
+  "main": "index",
+  "engines": {
+    "node": ">= 0.6.0"
+  },
+  "readme": "redis-hash\n==========",
+  "readmeFilename": "README.md",
+  "_id": "redis-hash@0.0.1",
+  "dist": {
+    "shasum": "4369f69bc26c995acc6f6b0faaa4897f2c727db1"
+  },
+  "_resolved": "git://github.com/FarzadT/redis-hash.git#3911a3ea4fa467e691d0fb965ec947f9d3d7026c",
+  "_from": "redis-hash@git://github.com/FarzadT/redis-hash.git"
 }

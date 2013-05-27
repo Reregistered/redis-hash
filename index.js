@@ -4,22 +4,34 @@
 // purpose: This class exposes a redis backed obj. useful
 // for additional resiliency in unstable environments, or across
 // server restarts.
+var util = require("util"),
+    redis = require("redis"),
+    EventEmitter = require('events').EventEmitter;
 
 var OBJPREFIX   = '[_obj_]';
 
 var fn_null = function(){};
 
 function redisHash(){
+
+  EventEmitter.call(this);
 }
+
+util.inherits(redisHash, EventEmitter);
 
 // init the object with the connection and the hash name
 redisHash.prototype.init = function(redisConnection, name, cbReady){
 
+  var that = this;
+
   cbReady = cbReady || fn_null;
 
-  this.obj  = {};
-  this.rc   = redisConnection;
+  this.obj = {};
+  this.rc  = redisConnection;
+  this.pubsub  = redis.createClient(redisConnection.port, redisConnection.host);
+
   this.name = name;
+  this.pubsubKey = this.name + '-hash';
 
   var that = this;
   this.rc.hgetall(name, function(err,res){
@@ -31,30 +43,34 @@ redisHash.prototype.init = function(redisConnection, name, cbReady){
         }
       }
     }
-
     cbReady(err);
-  })
+  });
+
+  // subscribe for update events.
+  this.pubsub.subscribe(this.pubsubKey);
+  this.on("message", function(channel, message){
+    var lmessage = JSON.parse(message);
+    if (lmessage.val && lmessage.val.indexOf(OBJPREFIX) === 0){
+      lmessage.val = JSON.parse(lmessage.val.replace(OBJPREFIX,''));
+    }
+    that.emit(lmessage.type, lmessage.key, lmessage.val);
+  });
 
 };
 
 redisHash.prototype.getVal = function(keyName, cb){
-
   cb = cb || fn_null;
-
   if (this.obj.hasOwnProperty(keyName)){
     cb(null,this.obj[keyName]);
     return;
   }
-
   var that = this;
   this.rc.hget([this.name,keyName], function(err,res){
-
     var retVal = res;
     if (res){
       if(res.indexOf(OBJPREFIX) === 0){
         retVal = JSON.parse(res.replace(OBJPREFIX,''));
       }
-
       that.obj[keyName] = retVal;
     }
 
@@ -70,7 +86,6 @@ redisHash.prototype.setVal = function(keyName, val, cb){
 
   var that = this;
   if (val !== undefined){
-
     if (typeof(val) === 'object'){
       dbVal = OBJPREFIX + JSON.stringify(val);
     }
@@ -80,6 +95,11 @@ redisHash.prototype.setVal = function(keyName, val, cb){
 
         if (!err){
           that.obj[keyName] = val;
+
+          this.pubsub.publish(this.pubsubKey, JSON.stringify({
+            type:'add',
+            key:keyName,
+            val: dbVal}));
         }
 
         cb(err,res)
@@ -91,6 +111,10 @@ redisHash.prototype.setVal = function(keyName, val, cb){
       function(err,res){
         if (!err){
           delete that.obj[keyName];
+
+          this.pubsub.publish(this.pubsubKey, JSON.stringify({
+            type:'remove',
+            key:keyName}));
         }
 
         cb(err,res);
