@@ -1,5 +1,5 @@
 {
-  "name": "redis-hash",
+  "name": "redis_hash",
   "version": "0.0.1",
   "description": "redis hash wrapper",
   "keywords": [
