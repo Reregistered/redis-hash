@@ -207,11 +207,7 @@ redisHash.prototype.some = function(itrCB){
 };
 
 redisHash.prototype.exists = function(keyName){
-  if(keyName in this.obj){
-    return true;
-  }else{
-    return false;
-  }
+  return (this.obj[keyName] != undefined);
 };
 
 redisHash.prototype.reset = function(){
