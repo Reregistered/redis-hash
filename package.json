@@ -1,5 +1,5 @@
 {
-  "name": "redis-hash",
+  "name": "redis_hash",
   "version": "0.9.1",
   "description": "redis hash wrapper",
   "keywords": [
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/FarzadT/redis-hash.git"
+    "url": "https://github.com/getteamup/redis-hash.git"
   },
   "author": {
     "name": "Farzad Towhidi"
