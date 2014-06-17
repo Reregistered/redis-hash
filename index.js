@@ -15,7 +15,44 @@ var fn_null = function(){};
 
 function redisHash(){
 
+  var that = this;
+
   EventEmitter.call(this);
+
+  //create a locally bound message handler
+  this.messageHandler = function(channel, message){
+
+    // set up the message object.
+    var lmessage = JSON.parse(message);
+
+    // if we've sent the message, ignore it
+    if (lmessage.sender === that.instanceId){
+      return;
+    }
+
+    if (lmessage.val && String(lmessage.val).indexOf(OBJPREFIX) === 0){
+      lmessage.val = JSON.parse(lmessage.val.replace(OBJPREFIX,''));
+    }
+
+    switch (lmessage.type){
+      case 'reset':
+        that.obj = {};
+        break;
+      case 'add':
+        that.obj[lmessage.key] = lmessage.val;
+        break;
+      case 'remove':
+        delete that.obj[lmessage.key];
+        break;
+      case 'default':
+        // unhandled message
+        break;
+    }
+
+    that.emit(lmessage.type, lmessage.key, lmessage.val);
+
+  };
+
 }
 
 util.inherits(redisHash, EventEmitter);
@@ -59,40 +96,27 @@ redisHash.prototype.initPubSub = function(){
   this.pubsub.subscribe(this.pubsubKey);
 
   // setup the pub sub message handler
-  this.pubsub.on("message", function(channel, message){
-
-    // set up the message object.
-    var lmessage = JSON.parse(message);
-
-    // if we've sent the message, ignore it
-    if (lmessage.sender === that.instanceId){
-      return;
-    }
-
-    if (lmessage.val && String(lmessage.val).indexOf(OBJPREFIX) === 0){
-      lmessage.val = JSON.parse(lmessage.val.replace(OBJPREFIX,''));
-    }
-
-    switch (lmessage.type){
-      case 'reset':
-        that.obj = {};
-        break;
-      case 'add':
-        that.obj[lmessage.key] = lmessage.val;
-        break;
-      case 'remove':
-        delete that.obj[lmessage.key];
-        break;
-      case 'default':
-        // unhandled message
-        break;
-    }
-
-    that.emit(lmessage.type, lmessage.key, lmessage.val);
-
-  });
+  this.pubsub.on("message", this.messageHandler );
+  this.pubsub.on("error", function(err){
+    console.error(err);
+  })
 };
 
+redisHash.prototype.cleanup = function(){
+
+  // remove the pub sub.
+  this.pubsub.unsubscribe(this.pubsubKey);
+  this.pubsub.removeListener("message", this.messageHandler );
+  this.pubsub.end();
+  this.pubsub = null;
+
+  // cleanup anything we may have been tracking.
+  this.rc.del(this.name, function(){});
+
+
+  delete this.rc;
+
+};
 
 redisHash.prototype.getVal = function(keyName, cb){
   cb = cb || fn_null;
@@ -119,6 +143,7 @@ redisHash.prototype.setVal = function(keyName, val, cb){
   cb = cb || fn_null;
 
   var dbVal = val;
+  var rc = this.rc;
 
   var that = this;
   if (val !== undefined){
@@ -126,13 +151,13 @@ redisHash.prototype.setVal = function(keyName, val, cb){
       dbVal = OBJPREFIX + JSON.stringify(val);
     }
 
-    this.rc.hset([this.name,keyName,dbVal],
+    rc.hset([this.name,keyName,dbVal],
       function(err,res){
 
         if (!err){
           that.obj[keyName] = val;
 
-          that.rc.publish(that.pubsubKey, JSON.stringify({
+          rc.publish(that.pubsubKey, JSON.stringify({
             sender: that.instanceId,
             type:'add',
             key:keyName,
@@ -144,11 +169,11 @@ redisHash.prototype.setVal = function(keyName, val, cb){
     );
 
   }else{
-    this.rc.hdel([this.name,keyName],
+    rc.hdel([this.name,keyName],
       function(err,res){
         if (!err){
           delete that.obj[keyName];
-          that.rc.publish(that.pubsubKey, JSON.stringify({
+          rc.publish(that.pubsubKey, JSON.stringify({
             sender: that.instanceId,
             type:'remove',
             key:keyName}));
@@ -221,6 +246,10 @@ redisHash.prototype.reset = function(){
           type:'reset'}));
       }
     });
+};
+
+redisHash.prototype.count = function(){
+  return (Object.keys(this.obj).length);
 };
 
 exports = module.exports = redisHash;
